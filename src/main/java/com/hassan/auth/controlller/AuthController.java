@@ -5,6 +5,8 @@ import com.hassan.auth.repository.EmailAuthRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -12,7 +14,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 
 @RestController
 @RequestMapping("/auth")
@@ -25,34 +29,46 @@ public class AuthController {
     private EmailAuthRepository emailAuthRepository;
 
     @PostMapping("/signup")
-    public HashMap<String, String> createAuthDetails(@RequestBody EmailAuth emailAuth) {
+    public ResponseEntity<HashMap<String, String>> createAuthDetails(@RequestBody EmailAuth emailAuth) {
+        HashMap<String, String> result = new HashMap<>();
         try {
+
             String hashedPassword = generateHash(emailAuth.getPassword());
             emailAuth.setPassword(hashedPassword);
             emailAuthRepository.save(emailAuth);
+            result.put("message", "Successfully signup user");
+
         } catch (DataIntegrityViolationException e) {
-            return new HashMap<String, String>() {{
-                put("message", "Existing User");
-            }};
+            result.put("message", "Existing User");
         }
-        return new HashMap<String, String>() {{
-            put("message", "Successfully signup user");
-        }};
+
+        return new ResponseEntity<>(result, HttpStatus.OK);
 
     }
 
     @PostMapping("/log")
-    public HashMap<String, String> logWithEmailAuth(@RequestBody EmailAuth emailAuth) {
-        String password = emailAuthRepository.findByEmail(emailAuth.getEmail()).get(0).getPassword();
-        String hashedPassword = generateHash(emailAuth.getPassword());
-        if(hashedPassword.equals(password))
-            return new HashMap<String, String>() {{
-                put("message", "Logged in");
-            }};
-        else
-            return new HashMap<String, String>() {{
-                put("message", "Invalid Password");
-            }};
+    public ResponseEntity<HashMap<String, String>> logWithEmailAuth(@RequestBody EmailAuth emailAuth) {
+
+        String password;
+        HashMap<String, String> result = new HashMap<>();
+        List<EmailAuth> emailAuths = emailAuthRepository.findByEmail(emailAuth.getEmail());
+
+        if(emailAuths.size() > 0) {
+            password = emailAuths.get(0).getPassword();
+            String hashedPassword = generateHash(emailAuth.getPassword());
+            if(hashedPassword.equals(password)) {
+                result.put("message", "Logged in");
+            }
+            else {
+                result.put("message", "Invalid Password");
+            }
+        }
+        else {
+            result.put("message", "User is not signup");
+        }
+
+        return new ResponseEntity<>(result, HttpStatus.OK);
+
     }
 
 
